@@ -46,8 +46,8 @@ class ExerciseData(models.Model):
     # def succeeded(self):
     #     return not self.failed
 
-    def get_data_wrapper_instance():
-        return self.definition.get_algorithm_instance().get_data_wrapper()(**data)
+    def get_wrapped_data(self):
+        return self.definition.get_algorithm_instance().wrap_data(self.data)
 
 
 

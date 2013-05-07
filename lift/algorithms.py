@@ -89,7 +89,6 @@ class ExerciseDataWrapper(object):
 
 
 
-
 class Strongliftish(Algorithm):
 
     DEFAULT_OPTIONS = {
@@ -155,7 +154,6 @@ class Strongliftish(Algorithm):
         return self.StrongliftishDataWrapper
 
 
-
     def build_first_exercise_data(self):
         algopts = self.options
         exer_data = self.get_exercise_data_wrapper()()
@@ -163,34 +161,51 @@ class Strongliftish(Algorithm):
         # Setup work sets
         exer_data.work_todo_sets = algopts["work"]["set_count"]
         exer_data.work_todo_reps = algopts["work"]["rep_count"]
-        exer_data.work_sets = [0]*exer_data.warmup_todo_reps
         exer_data.work_weight = algopts['work_weight_start']
-
         # Setup warmup sets
         exer_data.warmup_todo_sets = algopts["warmup"]["set_count"]
         exer_data.warmup_todo_reps = algopts["warmup"]["rep_count"]
-        exer_data.warmup_sets = [0]*exer_data.warmup_todo_sets
-        exer_data.warmup_weight = exer_data.work_weight*algopts["warmup_weight_factor"]
+        # Finish setup
+        self._zero_data(exer_data)
+
+    def _get_todo_sets(self, exer_data, name):
+        return [0]*getattr(exer_data,name)
+
+    def _zero_data(self, exer_data):
+        exer_data.work_sets = self._get_todo_sets(exer_data,"work")
+        exer_data.warmup_sets = self._get_todo_sets(exer_data,"warmup")
+        exer_data.warmup_weight = exer_data.work_weight * self.options["warmup_weight_factor"]
 
 
     def build_next_exercise_data(self, previous_exercise_data):
+        """
+        If `previous_exercise_data` is a QuerySet containing `ExerciseData`
+        then use that data to determine the *next* ExerciseData
+        """
         prevs = previous_exercise_data.order_by("-ts")
 
-        if prevs[0].succeeded:
+        exer_data = self.get_exercise_data_wrapper()()
 
-            if prevs[0].ts > datetime.now() - timedelta(days=14):
-                delta = ExerciseDelta(self.options["weight_increment, 
-                    "you successfully completed all your sets on %s" % prevs[0].ts)
-            else:
-                delta = ExerciseDelta(0,
-                    "your last successful set was more than two weeks ago.")
+        if prevs[0].succeeded:
+            # Upload weight!            
+            exer_data.from_dict(self.wrap_data(prevs[0].data).to_dict())
+            exer_data.work_weight += exer_data.work_weight * self.options["upload_factor"]
+            self._zero_data(exer_data)
 
         else:
-            if prevs[1].failed and prevs[2].failed:
-                delta = ExerciseDelta(prevs[0].weight, )
-            else:
-                delta = ExerciseDelta(prevs[0].weight,)
+            if self.did_fail_last_three(prevs):
+                # Use deloaded values from last one
+                exer_data.from_dict(self.wrap_data(prevs[0].data).to_dict())
+                exer_data.work_weight -= exer_data.work_weight * self.options["deload_factor"]
+                self._zero_data(exer_data)
 
+            else:
+                # Use same values as last one
+                exer_data.from_dict(self.wrap_data(prevs[0].data).to_dict())
+                self._zero_data(exer_data)
+
+        return exer_data
+                
 
     def did_fail_last_three(self, previous_exercise_data):
         prevs = previous_exercise_data.order_by("-ts")
