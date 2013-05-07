@@ -1,118 +1,107 @@
 from django.db import models
 from django.db.models import Q
 from django.conf import settings
+from jsonfield import JSONField
+
+from exercises import registry
 
 
+# class Set(models.Model):
+#     weight = models.DecimalField()
+#     reps_todo = models.SmallInteger()
+#     reps_done = models.SmallInteger(default=0)
+#     type = models.CharField(max_length=16)
+#     data = models.ForeignKey(ExerciseData, related_name="sets")
 
+#     @property
+#     def failed(self):
+#         return self.reps_done >= self.reps_todo:
 
-class Set(models.Model):
-    weight = models.DecimalField()
-    reps_todo = models.SmallInteger()
-    reps_done = models.SmallInteger(default=0)
-    type = models.CharField(max_length=16)
+#     @property
+#     def succeeded(self):
+#         return not self.failed
 
-    @property
-    def failed(self):
-        return self.reps_done >= self.reps_todo:
-
-    @property
-    def succeeded(self):
-        return not self.failed
 
 class ExerciseData(models.Model):
-
-    exercise_def
+    definition = models.ForeignKey(ExerciseDef)
     ts = models.DateTimeField(auto_now_add=True, index_db=True)
 
     previous = models.ForeignKey('self', null=True, blank=True)
     next = models.ForeignKey('self', null=True, blank=True)
-    definition = models.ForeignKey(ExerciseDef)
 
-    sets = models.ManyToManyField(Set)
+    notes = models.CharField(max_length=1024)
 
-    def did_fail_last_three(self):
-        if self.failed:
-            for exer in self.objects.filter(Q(next=self) & Q(next__next=self)):
-                if not exer.failed:
-                    return False
-            else:
-                return True
-        else:
-            return False
+    data = JSONField()
 
-    @property
-    def failed(self):
-        return any([x.failed in self.sets.all())
+    class Meta:
+        abstract = True
 
-    @property
-    def succeeded(self):
-        return not self.failed
+    # def get_instance(self):
 
+    # @property
+    # def failed(self):
+    #     return any([x.failed in self.sets.all()])
 
-class BarbellSquat():
+    # @property
+    # def succeeded(self):
+    #     return not self.failed
+
+    def get_data_wrapper_instance():
+        return self.definition.get_algorithm_instance().get_data_wrapper()(**data)
 
 
-
-
+class StrongliftExerciseData(ExerciseData):
+    sets_to_attempt = models.SmallIntegerField()
+    set_attempts = JSONField() # Array
+    set_attempts_weight = 
+    [
+        {"weight":"145lbs",'cnt':'15'}
+    ]
 
 
 class ExerciseDef(models.Model):
+
     display_name = models.CharField()
+    video_url = models.CharField(max_length=1024)
+
+    algorithm = models.CharField(max_length=256, choices=registry.choices)
+    options = JSONField()
 
 
-    set_count = models.SmallInteger()
+    def get_algorithm_instance(self):
+        return registry[self.algorithm](**self.options) # TODO: Security hole!?!
 
-    weight_start = models.DecimalField()
-    weight_increment = models.DecimalField()
+    def build_first_exercise_data(self):
+        return self.get_algorithm_instance().build_first_exercise_data()
 
-    video_url = models.CharField(max_length=256)
-
-
-    def build_first_exercise(self):
-
+    def build_next_exercise_data(self):
+        return self.get_algorithm_instance().build_next_exercise_data()
 
 
-    def build_next_exercise(self, user):
-        exercises = Exercise.object.filter(definition=self, 
-                                            workout__user=user).order_by("-ts")
-        if exercises.count() > 0:
-
-        
-
-
+class ExerciseDefRoutine(models.Model):
+    
+    exercise_def = models.ForeignKey(ExerciseDef)
+    routine = models.ForeignKey(Routine)
+    ordering = models.IntegerField()
 
 
 class Routine(models.Model):
     name = models.CharField()  # Day A
-    exercise_defs = models.ManyToManyField(ExerciseDef)
+    exercise_defs = models.ManyToManyField(ExerciseDef, through=ExerciseDefRoutine)
 
     def build_next_workout(self, user):
         for exercise_def in self.exercise_defs.all():
             return Workout(user=user, exercises=exercise_def.build_next_exercise())
 
 
-Routine {
-    name: "day a",
-    exercises: "bench press", "bar bell row", "squats"
-}
 
 
 
-class Workout(models.Model):
+# "What is today's workout?"
+# - "answer is a list of exercises"
 
-    generated_from = models.ForeignKey(routine)
-
-    exercise_defs = models.
-
-
-
-
-
-"What is today's workout?"
-- "answer is a list of exercises"
-
-"What weights should I use for this exercise?"
-- "answer is based on previous weights + available weights"
+# "What weights should I use for this exercise?"
+# - "answer is based on previous weights + available weights"
 
 
 
