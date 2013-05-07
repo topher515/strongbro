@@ -3,7 +3,7 @@ from django.db.models import Q
 from django.conf import settings
 from jsonfield import JSONField
 
-from exercises import registry
+from algorithm import registry
 
 
 # class Set(models.Model):
@@ -49,14 +49,6 @@ class ExerciseData(models.Model):
     def get_data_wrapper_instance():
         return self.definition.get_algorithm_instance().get_data_wrapper()(**data)
 
-
-class StrongliftExerciseData(ExerciseData):
-    sets_to_attempt = models.SmallIntegerField()
-    set_attempts = JSONField() # Array
-    set_attempts_weight = 
-    [
-        {"weight":"145lbs",'cnt':'15'}
-    ]
 
 
 class ExerciseDef(models.Model):

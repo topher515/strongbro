@@ -1,7 +1,5 @@
 import json
 
-from lift.models import ExerciseData
-
 from datetime import datetime, timedelta
 from django import forms
 
