@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from django import forms
 
 from utils import ClassRegistry
+from collections import namedtuple, defaultdict
+from numbers import Number
 
 
 registry = ClassRegistry()
@@ -61,87 +63,83 @@ class Algorithm(object):
         self.options.update(self.DEFAULT_OPTIONS)
         self.options.update(options)
 
-    def get_exercise_data_wrapper(self):
-        raise NotImplementedError()
 
     def wrap_data(self, data):
-        DataWrapper = self.get_exercise_data_wrapper()
-        return DataWrapper().from_dict(data)
-
+        return self.DataWrapper().from_dict(data)
     
-class ExerciseDataWrapper(object):
-    """
-    The `ExercisedataWrapper` defines functionality which can be determined
-    from *just this* exercise data. (For instance, was this exercise failed
-    at this weight?)
+    class DataWrapper(object):
+        """
+        The `ExercisedataWrapper` defines functionality which can be determined
+        from *just this* exercise data. (For instance, was this exercise failed
+        at this weight?)
 
-    Also, it should know how to serialize this data to JSON and back
-    """
+        Also, it should know how to serialize this data to JSON and back
+        """
 
-    def from_dict(self):
-        raise NotImplementedError()
+        def from_dict(self, data):
+            raise NotImplementedError()
 
-    def to_dict(self):
-        raise NotImplementedError()
+        def to_dict(self):
+            raise NotImplementedError()
 
-    def to_json(self):
-        return json.dumps(self.to_dict())
+        def to_json(self):
+            return json.dumps(self.to_data())
+
+
 
 
 
 class Strongliftish(Algorithm):
 
+    Set = namedtuple('Set', ['name', 'assigned_reps', 'completed_reps', 'weight', 'rested_secs'])
+    SetDef = namedtuple('SetDef', ['assigned_reps','work_weight_factor', 'rest_secs'])
+
     DEFAULT_OPTIONS = {
 
-        "warmup":{
-            "set_count":1,
-            "rep_count":3,
-
-        },
-        "work":{
-            "set_count":5,
-            "rep_count":5,
+        "set_def":{
+            # name:   reps, work_weight_factor, rest_secs
+            "warmup":SetDef(3, 0.5, 60*1.5),
+            "work":  SetDef(5, 1.0, 60*1.5),
         },
 
-        "work_weight_start":"<min>",
-        "warmup_weight_factor":0.5,
+        "sets":[
+            ["warmup", 1],
+            ["work",   5],
+        ],
+
+
+        "work_weight":"MIN",
         "upload_factor":0.02,
-        "deload_factor":0.2,
+        "deload_factor":-0.2,
     }
 
 
-    class StrongliftishDataWrapper(ExerciseDataWrapper):
+    class DataWrapper(Algorithm.DataWrapper):
+
+        version = 1
 
         def __init__(self):
-            self.warmup_todo_sets = None
-            self.warmup_todo_reps = None
-            self.warmup_sets = None
-            self.warmup_weight = None
-            self.work_todo_sets = None
-            self.work_todo_reps = None
-            self.work_sets = None
-            self.work_weight = None
+            self.sets = []
         
         def from_dict(self, data):
-            wrmup = data["wrmup"]
-            work = data["work"]
-            self.warmup_todo_sets = wrmup["todo_s"]
-            self.warmup_todo_reps = wrmup["todo_r"]
-            self.warmup_sets = wrmup["comp"]
-            self.warmup_weight = wrmup["wght"]
-            self.work_todo_sets = work["todo_s"]
-            self.work_todo_reps = work["todo_r"]
-            self.work_sets = work["comp"]
-            self.work_weight = wrmup["wght"]
-            return self
+            self.sets = [Strongliftish.Set(*set_) for set_ in data["sets"]]
+            self.work_weight = data["w"]
 
         def to_dict(self):
-            return # TODO Write this (the reverse of from_dict)
+            return {"sets":[set_ for set_ in self.sets], "w":self.work_weight}
+
+        def zero_data(self):
+            for set_ in self.sets:
+                set_.completed_reps = 0
+                set_.rested_secs = 0
+
 
         @property
         def failed(self):
-            for rep in self.work_sets:
-                if rep < self.work_todo_reps:
+            for set_ in self.sets:
+                if set_.name != "work":
+                    continue
+                if set_.assigned_reps > set_.completed_reps:
                     return True
             return False
 
@@ -150,32 +148,56 @@ class Strongliftish(Algorithm):
             return not self.failed
 
 
-    def get_exercise_data_wrapper(self):
-        return self.StrongliftishDataWrapper
+    def get_default_weight(self):
+        w = self.options['work_weight']
+        if isinstance(w,Number):
+            return w
+        elif w == "MIN":
+            return BARBELLS[0]
+        else:
+            raise ValueError("Unexpected work_weight value: %s" % w)
 
+
+    def set_new_work_weight(self, exer_data, weight):
+        for set_ in exer_data.sets:
+            set_.weight = weight * \
+                        self.options["set_def"][set_.name].work_weight_factor
+        exer_data.work_weight = weight
 
     def build_first_exercise_data(self):
-        algopts = self.options
-        exer_data = self.get_exercise_data_wrapper()()
 
-        # Setup work sets
-        exer_data.work_todo_sets = algopts["work"]["set_count"]
-        exer_data.work_todo_reps = algopts["work"]["rep_count"]
-        exer_data.work_weight = algopts['work_weight_start']
-        # Setup warmup sets
-        exer_data.warmup_todo_sets = algopts["warmup"]["set_count"]
-        exer_data.warmup_todo_reps = algopts["warmup"]["rep_count"]
-        # Finish setup
-        self._zero_data(exer_data)
+        exer_data = self.DataWrapper()
 
-    def _get_todo_sets(self, exer_data, name):
-        return [0]*getattr(exer_data,name)
+        for set_name, set_count in self.options["sets"].iteritems():
+            for i in xrange(set_count):
+                set_def = self.options["set_def"][set_name]
+                set_ = Strongliftish.Set(name=set_name, 
+                            assigned_reps=set_def.assigned_reps,
+                            completed_reps=0, 
+                            work_weight=0, # This is set later 
+                            rest_secs=set_def.rest_secs)
+                exer_data.sets.append(set_)
+        self.set_new_work_weight(exer_data, self.get_default_weight())
 
-    def _zero_data(self, exer_data):
-        exer_data.work_sets = self._get_todo_sets(exer_data,"work")
-        exer_data.warmup_sets = self._get_todo_sets(exer_data,"warmup")
-        exer_data.warmup_weight = exer_data.work_weight * self.options["warmup_weight_factor"]
+        return exer_data
 
+    def xload(self, factor_name, exer_data):
+        new_weight = exer_data.work_weight + (
+                    exer_data.work_weight * self.options[factor_name])
+        self.set_new_work_weight(exer_data, new_weight)
+        exer_data.zero_data()
+        return exer_data
+
+    def duplicate(self, old_exer_data):
+        exer_data = self.DataWrapper()
+        exer_data.from_dict(old_exer_data.to_dict())
+        return exer_data
+
+    def build_new_with_upload(self, exer_data):
+        return self.xload("upload_factor", self.duplicate(exer_data))
+
+    def build_new_with_deload(self, exer_data):
+        return self.xload("deload_factor", self.duplicate(exer_data))
 
     def build_next_exercise_data(self, previous_exercise_data):
         """
@@ -184,25 +206,22 @@ class Strongliftish(Algorithm):
         """
         prevs = previous_exercise_data.order_by("-ts")
 
-        exer_data = self.get_exercise_data_wrapper()()
 
-        if prevs[0].succeeded:
-            # Upload weight!            
-            exer_data.from_dict(self.wrap_data(prevs[0].data).to_dict())
-            exer_data.work_weight += exer_data.work_weight * self.options["upload_factor"]
-            self._zero_data(exer_data)
+        last_exer = self.wrap_data(prevs[0].data)
+
+        if last_exer.succeeded:
+            # Use upload values from last one         
+            exer_data = self.build_new_with_upload(last_exer)
 
         else:
             if self.did_fail_last_three(prevs):
-                # Use deloaded values from last one
-                exer_data.from_dict(self.wrap_data(prevs[0].data).to_dict())
-                exer_data.work_weight -= exer_data.work_weight * self.options["deload_factor"]
-                self._zero_data(exer_data)
+                # Use deloaded values based on last one
+                exer_data = self.build_new_with_deload(last_exer)
 
             else:
                 # Use same values as last one
-                exer_data.from_dict(self.wrap_data(prevs[0].data).to_dict())
-                self._zero_data(exer_data)
+                exer_data = self.duplicate(last_exer)
+                exer_data.zero_data()
 
         return exer_data
                 
