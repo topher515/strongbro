@@ -83,7 +83,7 @@ class Algorithm(object):
             raise NotImplementedError()
 
         def to_json(self):
-            return json.dumps(self.to_data())
+            return json.dumps(self.to_dict())
 
 
 
