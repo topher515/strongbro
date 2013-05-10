@@ -88,7 +88,7 @@ class Algorithm(object):
 
 
 
-
+@registry.register
 class Strongliftish(Algorithm):
 
     Set = namedlist('Set', ['name', 'assigned_reps', 'completed_reps', 'weight', 'rested_secs'])

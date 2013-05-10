@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import Q
 from django.conf import settings
-from jsonfield import JSONField
+from jsonfield import JSONCharField
 
 from algorithms import registry
 
@@ -30,7 +30,7 @@ class ExerciseData(models.Model):
 
     notes = models.CharField(max_length=1024)
 
-    data = JSONField()
+    data = JSONCharField(default="{}", max_length=10000)
 
     def get_exer_data(self):
         if not hasattr(self, '_exer_data_cache'):
@@ -50,10 +50,10 @@ class ExerciseData(models.Model):
 class ExerciseDef(models.Model):
 
     display_name = models.CharField(max_length=512)
-    video_url = models.CharField(max_length=1024)
+    video_url = models.CharField(max_length=1024, blank=True)
 
     algorithm = models.CharField(max_length=256, choices=registry.choices)
-    options = JSONField()
+    options = JSONCharField(default="{}", max_length=10000)
 
 
     def get_algorithm_instance(self):
