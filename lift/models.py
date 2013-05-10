@@ -26,25 +26,11 @@ class ExerciseData(models.Model):
     definition = models.ForeignKey('lift.ExerciseDef')
     ts = models.DateTimeField(auto_now_add=True, db_index=True)
 
-    previous = models.ForeignKey('self', null=True, blank=True)
-    next = models.ForeignKey('self', null=True, blank=True)
+    previous = models.OneToOneField('self', null=True, blank=True, related_name="next")
 
     notes = models.CharField(max_length=1024)
 
     data = JSONField()
-
-    class Meta:
-        abstract = True
-
-    # def get_instance(self):
-
-    # @property
-    # def failed(self):
-    #     return any([x.failed in self.sets.all()])
-
-    # @property
-    # def succeeded(self):
-    #     return not self.failed
 
     def get_exer_data(self):
         if not hasattr(self, '_exer_data_cache'):
