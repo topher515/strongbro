@@ -3,8 +3,8 @@ import json
 from datetime import datetime, timedelta
 from django import forms
 
-from utils import ClassRegistry
-from collections import namedtuple, defaultdict
+from utils import ClassRegistry, namedlist
+from collections import defaultdict # namedtuple, 
 from numbers import Number
 
 
@@ -91,8 +91,8 @@ class Algorithm(object):
 
 class Strongliftish(Algorithm):
 
-    Set = namedtuple('Set', ['name', 'assigned_reps', 'completed_reps', 'weight', 'rested_secs'])
-    SetDef = namedtuple('SetDef', ['assigned_reps','work_weight_factor', 'rest_secs'])
+    Set = namedlist('Set', ['name', 'assigned_reps', 'completed_reps', 'weight', 'rested_secs'])
+    SetDef = namedlist('SetDef', ['assigned_reps','work_weight_factor', 'rest_secs'])
 
     DEFAULT_OPTIONS = {
 
@@ -120,7 +120,12 @@ class Strongliftish(Algorithm):
 
         def __init__(self):
             self.sets = []
+            self.work_weight = None
         
+        @property
+        def exer_data(self):
+            return self
+
         def from_dict(self, data):
             self.sets = [Strongliftish.Set(*set_) for set_ in data["sets"]]
             self.work_weight = data["w"]
@@ -168,14 +173,14 @@ class Strongliftish(Algorithm):
 
         exer_data = self.DataWrapper()
 
-        for set_name, set_count in self.options["sets"].iteritems():
+        for set_name, set_count in self.options["sets"]:
             for i in xrange(set_count):
                 set_def = self.options["set_def"][set_name]
                 set_ = Strongliftish.Set(name=set_name, 
                             assigned_reps=set_def.assigned_reps,
                             completed_reps=0, 
-                            work_weight=0, # This is set later 
-                            rest_secs=set_def.rest_secs)
+                            weight=0, # This is set later 
+                            rested_secs=0)
                 exer_data.sets.append(set_)
         self.set_new_work_weight(exer_data, self.get_default_weight())
 
@@ -199,15 +204,14 @@ class Strongliftish(Algorithm):
     def build_new_with_deload(self, exer_data):
         return self.xload("deload_factor", self.duplicate(exer_data))
 
-    def build_next_exercise_data(self, previous_exercise_data):
+    def build_next_exercise_data(self, previous_exercises):
         """
         If `previous_exercise_data` is a QuerySet containing `ExerciseData`
         then use that data to determine the *next* ExerciseData
         """
-        prevs = previous_exercise_data.order_by("-ts")
+        prevs = previous_exercises
 
-
-        last_exer = self.wrap_data(prevs[0].data)
+        last_exer = prevs[0].exer_data
 
         if last_exer.succeeded:
             # Use upload values from last one         
@@ -226,12 +230,11 @@ class Strongliftish(Algorithm):
         return exer_data
                 
 
-    def did_fail_last_three(self, previous_exercise_data):
-        prevs = previous_exercise_data.order_by("-ts")
+    def did_fail_last_three(self, previous_exercises):
+        prevs = previous_exercises
 
-        for data_from_db in prevs[:3]:
-            data = self.wrap_data(data_from_db.data)
-            if data.succeeded():
+        for p in prevs[:3]:
+            if p.exer_data.succeeded:
                 return False
         return True
 

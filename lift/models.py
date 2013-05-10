@@ -3,7 +3,7 @@ from django.db.models import Q
 from django.conf import settings
 from jsonfield import JSONField
 
-from algorithm import registry
+from algorithms import registry
 
 
 # class Set(models.Model):
@@ -23,8 +23,8 @@ from algorithm import registry
 
 
 class ExerciseData(models.Model):
-    definition = models.ForeignKey(ExerciseDef)
-    ts = models.DateTimeField(auto_now_add=True, index_db=True)
+    definition = models.ForeignKey('lift.ExerciseDef')
+    ts = models.DateTimeField(auto_now_add=True, db_index=True)
 
     previous = models.ForeignKey('self', null=True, blank=True)
     next = models.ForeignKey('self', null=True, blank=True)
@@ -46,14 +46,24 @@ class ExerciseData(models.Model):
     # def succeeded(self):
     #     return not self.failed
 
-    def get_wrapped_data(self):
-        return self.definition.get_algorithm_instance().wrap_data(self.data)
+    def get_exer_data(self):
+        if not hasattr(self, '_exer_data_cache'):
+            self._exer_data_cache = self.definition.get_algorithm_instance()\
+                                            .wrap_data(self.data) 
+        return self._exer_data_cache
+
+    def set_exer_data(self, exer_data):
+        self.data = exer_data.to_json()
+        self._exer_data_cache = exer_data
+
+    exer_data = property(get_exer_data, set_exer_data)
+
 
 
 
 class ExerciseDef(models.Model):
 
-    display_name = models.CharField()
+    display_name = models.CharField(max_length=512)
     video_url = models.CharField(max_length=1024)
 
     algorithm = models.CharField(max_length=256, choices=registry.choices)
@@ -70,20 +80,20 @@ class ExerciseDef(models.Model):
         return self.get_algorithm_instance().build_next_exercise_data()
 
 
-class ExerciseDefRoutine(models.Model):
+# class ExerciseDefRoutine(models.Model):
     
-    exercise_def = models.ForeignKey(ExerciseDef)
-    routine = models.ForeignKey(Routine)
-    ordering = models.IntegerField()
+#     exercise_def = models.ForeignKey(ExerciseDef)
+#     routine = models.ForeignKey(Routine)
+#     ordering = models.IntegerField()
 
 
-class Routine(models.Model):
-    name = models.CharField()  # Day A
-    exercise_defs = models.ManyToManyField(ExerciseDef, through=ExerciseDefRoutine)
+# class Routine(models.Model):
+#     name = models.CharField()  # Day A
+#     exercise_defs = models.ManyToManyField(ExerciseDef, through=ExerciseDefRoutine)
 
-    def build_next_workout(self, user):
-        for exercise_def in self.exercise_defs.all():
-            return Workout(user=user, exercises=exercise_def.build_next_exercise())
+#     def build_next_workout(self, user):
+#         for exercise_def in self.exercise_defs.all():
+#             return Workout(user=user, exercises=exercise_def.build_next_exercise())
 
 
 
