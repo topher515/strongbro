@@ -25,12 +25,13 @@ from algorithms import registry
 class ExerciseData(models.Model):
     definition = models.ForeignKey('lift.ExerciseDef')
     ts = models.DateTimeField(auto_now_add=True, db_index=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL)
 
     previous = models.OneToOneField('self', null=True, blank=True, related_name="next")
 
     notes = models.CharField(max_length=1024)
 
-    data = JSONCharField(default="{}", max_length=10000)
+    data = JSONCharField(default="{}", max_length=1000)
 
     def get_exer_data(self):
         if not hasattr(self, '_exer_data_cache'):
@@ -53,7 +54,7 @@ class ExerciseDef(models.Model):
     video_url = models.CharField(max_length=1024, blank=True)
 
     algorithm = models.CharField(max_length=256, choices=registry.choices)
-    options = JSONCharField(default="{}", max_length=10000)
+    options = JSONCharField(default="{}", max_length=1000)
 
 
     def get_algorithm_instance(self):
