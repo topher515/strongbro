@@ -10,20 +10,26 @@ from django.db.models.query import EmptyQuerySet
 from lift.models import ExerciseData
 
 class JsonView(View):
+    """
+    A view which returns JSON
+    """
 
-    def get_json(self, *args, **kwargs):
+    def get_json(self, request, *args, **kwargs):
         raise NotImplementedError()
 
+    def get_json_response(self, *args, **kwargs):
+        return HttpResponse(self.get_json(self, *args, **kwargs), status=200)
+
     def get(self, *args, **kwargs):
-        return self.get_json(*args, **kwargs)
+        return self.get_json_response(*args, **kwargs)
 
 
 class AuthMixin(object):
 
     #@method_decorator(login_required)
-    def dispatch(self, request, *args, **kwargs):
+    def dispatch(self, *args, **kwargs):
 
-        if not request.user.is_authenticated():
+        if not self.request.user.is_authenticated():
             return HttpResponse(json.dumps({
                     "error":"not authorized"}),status=403)
 
@@ -42,7 +48,7 @@ class ModelJsonView(JsonView):
     def get_query_set(self):
         return self.query_set.filter(user=self.request.user)
 
-    def get_json(self, request):
+    def get_json(self, request, *args, **kwargs):
         return self.serializer.serialize(self.get_query_set())
 
 

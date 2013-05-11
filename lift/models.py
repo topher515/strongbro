@@ -1,7 +1,9 @@
+from datetime import datetime
+
 from django.db import models
 from django.db.models import Q
 from django.conf import settings
-from jsonfield import JSONCharField
+from json_field.fields import JSONField
 
 from algorithms import registry
 
@@ -29,9 +31,13 @@ class ExerciseData(models.Model):
 
     previous = models.OneToOneField('self', null=True, blank=True, related_name="next")
 
-    notes = models.CharField(max_length=1024)
+    notes = models.CharField(max_length=1024, blank=True)
 
-    data = JSONCharField(default="{}", max_length=1000)
+    data = JSONField(default="{}", max_length=1000)
+
+    def __unicode__(self):
+        return "%s's %s on %s" % (self.user, self.definition.display_name, 
+                datetime.strftime(self.ts, "%Y-%d-%m"))
 
     def get_exer_data(self):
         if not hasattr(self, '_exer_data_cache'):
@@ -47,15 +53,16 @@ class ExerciseData(models.Model):
 
 
 
-
 class ExerciseDef(models.Model):
 
     display_name = models.CharField(max_length=512)
     video_url = models.CharField(max_length=1024, blank=True)
 
     algorithm = models.CharField(max_length=256, choices=registry.choices)
-    options = JSONCharField(default="{}", max_length=1000)
+    options = JSONField(default="{}", max_length=1000)
 
+    def __unicode__(self):
+        return u"%s (%s)" % (self.display_name, self.algorithm)
 
     def get_algorithm_instance(self):
         return registry[self.algorithm](**self.options) # TODO: Security hole!?!

@@ -2,6 +2,7 @@ class ClassRegistry(dict):
 
     def register(self, class_):
         self[class_.__name__] = class_
+        return class_
 
     @property
     def choices(self):

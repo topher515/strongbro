@@ -128,6 +128,7 @@ INSTALLED_APPS = (
 
     # Libs
     'south',
+    'json_field',
 
     # My apps
     'lift',
