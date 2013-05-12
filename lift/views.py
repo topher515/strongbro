@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.views.generic import View, TemplateView
 from django.db.models.query import EmptyQuerySet
 
-from lift.models import ExerciseData
+from lift.models import ExerciseData, WorkoutData, ExerciseDef, WorkoutDef
 from lift.serializer import ExerciseDataJSONSerializer
 
 
@@ -61,7 +61,33 @@ class ModelJsonView(JsonView):
         return self.serializer.serialize(self.get_query_set())
 
 
-class Exercises(AuthMixin, ModelJsonView):
+class ExerciseDataView(AuthMixin, ModelJsonView):
 
     query_set = ExerciseData.objects.all()
+
+
+class WorkoutDataView(AuthMixin, ModelJsonView):
+
+    query_set = WorkoutData.objects.all()
+
+
+
+    def post(self, request, *args, **kwargs):
+        if request.POST.get('id', None):
+            workout_def = WorkoutDef.objects.get(id=request.POST['id'])
+        elif request.POST.get('display_name'):
+            workout_def = WorkoutDef.objects.get(display_name=request.POST['display_name'])
+
+
+        workout_data = WorkoutData.objects.filter(workout_def=workout_def)
+        if workout_data.count() == 0:
+            
+
+        for exercise_def in workout_def.exercise_defs.all():
+            exercise_def.
+
+
+
+
+
 

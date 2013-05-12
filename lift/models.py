@@ -24,6 +24,8 @@ from algorithms import registry
 #         return not self.failed
 
 
+### Data
+
 class ExerciseData(models.Model):
     definition = models.ForeignKey('lift.ExerciseDef')
     ts = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -52,6 +54,24 @@ class ExerciseData(models.Model):
     exer_data = property(get_exer_data, set_exer_data)
 
 
+class ExerciseInWorkoutData(models.Model):
+    exercise = models.ForeignKey('lift.ExerciseData')
+    workout = models.ForeignKey('lift.WorkoutData')
+    ordering = models.SmallIntegerField()
+
+
+class WorkoutData(models.Model):
+    ts = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL)
+
+    previous = models.OneToOneField('self', null=True, blank=True, related_name="next")
+
+    exercise_data = models.ManyToManyField(ExerciseData, through=ExerciseInWorkoutData)
+    workout_def = models.ForeignKey('lift.WorkoutDef')
+
+
+###
+### Definitions
 
 class ExerciseDef(models.Model):
 
@@ -65,20 +85,56 @@ class ExerciseDef(models.Model):
         return u"%s (%s)" % (self.display_name, self.algorithm)
 
     def get_algorithm_instance(self):
-        return registry[self.algorithm](**self.options) # TODO: Security hole!?!
+        return registry[self.algorithm](**self.options)
 
-    def build_first_exercise_data(self):
-        return self.get_algorithm_instance().build_first_exercise_data()
+    def build_first_exercise_data(self, user, commit=True):
+        e = ExerciseData(definition=self,user=user)
+        empty_data = self.get_algorithm_instance().build_first_exercise_data()
+        e.exer_data = empty_data
+        if commit:
+            e.save()
+        return e
 
-    def build_next_exercise_data(self):
-        return self.get_algorithm_instance().build_next_exercise_data()
+    def build_next_exercise_data(self, user, commit=True):
+        e = ExerciseData(definition=self, user=user)
+        previous_exercise_data = ExerciseData.objects\
+                        .filter(definition=self,user=user).order_by('-ts')
+        e.previous = previous_exercise_data[0]
+
+        # Populate data field
+        empty_data = self.get_algorithm_instance()\
+                        .build_next_exercise_data(previous_exercise_data)
+        e.exer_data = empty_data
+        
+        # Save to db
+        if commit:
+            e.save()
+        return e
 
 
-# class ExerciseDefRoutine(models.Model):
+class ExerciseInWorkoutDef(models.Model):
+    exercise = models.ForeignKey('lift.ExerciseDef')
+    workout = models.ForeignKey('lift.WorkoutDef')
+    ordering = models.SmallIntegerField()
+
+
+class WorkoutDef(models.Model):
     
-#     exercise_def = models.ForeignKey(ExerciseDef)
-#     routine = models.ForeignKey(Routine)
-#     ordering = models.IntegerField()
+    exercise_defs = models.ManyToManyField(ExerciseDef, through=ExerciseInWorkoutDef)
+    display_name = models.CharField(max_length=512)
+
+    def _build_x_workout_data(self, x, user):
+        workout_data = WorkoutData.objects.create(user=user, workout_def=self)
+        for e in self.exercise_defs.order_by('ordering'):
+            new_exercise_data = getattr(e,'build_%s_exercise_data' % x)(user=user)
+            workout_data.exercise_data.add(new_exercise_data)
+
+    def build_first_workout_data(self, user):
+        self._build_x_workout_data('first',user)
+
+    def build_next_workout_data(self, user):
+        self._build_x_workout_data('next',user)
+
 
 
 # class Routine(models.Model):
