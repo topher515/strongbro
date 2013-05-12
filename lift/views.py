@@ -8,6 +8,13 @@ from django.views.generic import View, TemplateView
 from django.db.models.query import EmptyQuerySet
 
 from lift.models import ExerciseData
+from lift.serializer import ExerciseDataJSONSerializer
+
+
+custom_serializers = {
+    "json":ExerciseDataJSONSerializer
+}
+
 
 class JsonView(View):
     """
@@ -41,8 +48,10 @@ class ModelJsonView(JsonView):
     query_set = EmptyQuerySet()
 
     def __init__(self, serializer="json", *args, **kwargs):
-        Serializer = serializers.get_serializer(serializer)
+        #Serializer = serializers.get_serializer(serializer)
+        Serializer = custom_serializers[serializer]
         self.serializer = Serializer()
+        print self.serializer
         super(ModelJsonView, self).__init__(*args,**kwargs)
 
     def get_query_set(self):
@@ -55,3 +64,4 @@ class ModelJsonView(JsonView):
 class Exercises(AuthMixin, ModelJsonView):
 
     query_set = ExerciseData.objects.all()
+
