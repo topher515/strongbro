@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.db import models
 from django.db.models import Q
+from django.core.urlresolvers import reverse
 from django.conf import settings
 from json_field.fields import JSONField
 
@@ -54,20 +55,24 @@ class ExerciseData(models.Model):
     exer_data = property(get_exer_data, set_exer_data)
 
 
-class ExerciseInWorkoutData(models.Model):
-    exercise = models.ForeignKey('lift.ExerciseData')
-    workout = models.ForeignKey('lift.WorkoutData')
-    ordering = models.SmallIntegerField()
-
-
 class WorkoutData(models.Model):
     ts = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL)
 
     previous = models.OneToOneField('self', null=True, blank=True, related_name="next")
 
-    exercise_data = models.ManyToManyField(ExerciseData, through=ExerciseInWorkoutData)
+    exercise_data = models.ManyToManyField(ExerciseData, through='DataMembership')
     workout_def = models.ForeignKey('lift.WorkoutDef')
+    
+    def __unicode__(self):
+        return "%s's %s on %s" % (self.user, self.workout_def.display_name, 
+                datetime.strftime(self.ts, "%Y-%d-%m"))
+
+
+class DataMembership(models.Model):
+    exercise = models.ForeignKey(ExerciseData)
+    workout = models.ForeignKey(WorkoutData)
+    ordering = models.SmallIntegerField()
 
 
 ###
@@ -79,7 +84,7 @@ class ExerciseDef(models.Model):
     video_url = models.CharField(max_length=1024, blank=True)
 
     algorithm = models.CharField(max_length=256, choices=registry.choices)
-    options = JSONField(default="{}", max_length=1000)
+    options = JSONField(default="{}", max_length=1000, blank=True)
 
     def __unicode__(self):
         return u"%s (%s)" % (self.display_name, self.algorithm)
@@ -112,29 +117,32 @@ class ExerciseDef(models.Model):
         return e
 
 
-class ExerciseInWorkoutDef(models.Model):
-    exercise = models.ForeignKey('lift.ExerciseDef')
-    workout = models.ForeignKey('lift.WorkoutDef')
-    ordering = models.SmallIntegerField()
-
-
 class WorkoutDef(models.Model):
     
-    exercise_defs = models.ManyToManyField(ExerciseDef, through=ExerciseInWorkoutDef)
+    exercise_defs = models.ManyToManyField(ExerciseDef, through='DefMembership')
     display_name = models.CharField(max_length=512)
+
+    def __unicode__(self):
+        return self.display_name
 
     def _build_x_workout_data(self, x, user):
         workout_data = WorkoutData.objects.create(user=user, workout_def=self)
         for e in self.exercise_defs.order_by('ordering'):
             new_exercise_data = getattr(e,'build_%s_exercise_data' % x)(user=user)
             workout_data.exercise_data.add(new_exercise_data)
+        return workout_data
 
     def build_first_workout_data(self, user):
-        self._build_x_workout_data('first',user)
+        return self._build_x_workout_data('first',user)
 
     def build_next_workout_data(self, user):
-        self._build_x_workout_data('next',user)
+        return self._build_x_workout_data('next',user)
 
+
+class DefMembership(models.Model):
+    exercise = models.ForeignKey('lift.ExerciseDef')
+    workout = models.ForeignKey('lift.WorkoutDef')
+    ordering = models.SmallIntegerField()
 
 
 # class Routine(models.Model):
