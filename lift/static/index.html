@@ -21,11 +21,11 @@
    
         <ul class="exercises">
           <li ng-repeat="exercise in exercises">
-            {{exercise.name}}
+            {{exercise.definition.display_name}}
             
             <ul class="sets">
               <li class="set" class="set-{{set.name}}" ng-repeat="set in exercise.data.sets">
-                <div class="weight">{{ set.weight }}</div>
+                <div class="weight">{{ set.cur_weight }}</div>
                 <div class="assigned-reps">{{ set.assigned_reps }}</div>
                 <div class="completed-reps">{{ set.completed_reps }}</div>
 

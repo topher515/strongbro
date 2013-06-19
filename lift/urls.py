@@ -4,17 +4,17 @@ from lift.views import *
 
 urlpatterns = patterns('',
 
-	url(r'^exercises/defs/?$', ExerciseDefView.as_view(), {}),
-	url(r'^exercises/defs/(?P<id>[0-9]+)/?$', ExerciseDefDetailView.as_view(), {}),
+	url(r'^exercises/defs/?$', ExerciseDefView.as_view(), {}, name="exercise-def-list-json"),
+	url(r'^exercises/defs/(?P<id>[0-9]+)/?$', ExerciseDefDetailView.as_view(), {}, name="exercise-def-detail-json"),
 
 	url(r'^workouts/defs/?$', WorkoutDefView.as_view(), {}),
 	url(r'^workouts/defs/(?P<id>[0-9]+)/?$', WorkoutDefDetailView.as_view(), {}),
 
-    url(r'^exercises/data/?$', ExerciseDataView.as_view(), {}, name="exercise-list-data-json"),
+    url(r'^exercises/data/?$', ExerciseDataView.as_view(), {}, name="exercise-data-list-json"),
     url(r'^exercises/data/(?P<id>[0-9]+)/?$', ExerciseDataDetailView.as_view(), {}, name="exercise-data-detail-json"),
     
-    url(r'^workouts/data/?$', WorkoutDataView.as_view(), {}, name="workout-list-data-json"),
-    url(r'^workouts/data/(?P<id>[0-9]+)\.json$', WorkoutDataDetailView.as_view(), {}, name="workout-data-detail-json"),
+    url(r'^workouts/data/?$', WorkoutDataView.as_view(), {}, name="workout-data-list-json"),
+    url(r'^workouts/data/(?P<id>[0-9]+)/?$', WorkoutDataDetailView.as_view(), {}, name="workout-data-detail-json"),
 )
 
 

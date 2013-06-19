@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 
 from django.db import models
 from django.db.models import Q
@@ -52,7 +53,21 @@ class ExerciseData(models.Model):
         self.data = exer_data.to_json()
         self._exer_data_cache = exer_data
 
+    def serialize_data_field(self, field):
+        return self.exer_data.to_api_dict()
+
+        #return json.loads(field.value_to_string(self))
+
+    def serialize_definition_field(self, field):
+        from serializer import DetailJSONSerializer
+        #return self.definition.get_absolute_url()
+        return json.loads(DetailJSONSerializer().serialize([self.definition]))
+
     exer_data = property(get_exer_data, set_exer_data)
+
+    def get_absolute_url(self):
+        return reverse('exercise-data-detail-json', args=[str(self.id)])
+
 
 
 class WorkoutData(models.Model):
@@ -115,6 +130,12 @@ class ExerciseDef(models.Model):
         if commit:
             e.save()
         return e
+
+    def serialize_options_field(self, field):
+        return json.loads(field.value_to_string(self))
+
+    def get_absolute_url(self):
+        return reverse('exercise-def-detail-json', args=[str(self.id)])
 
 
 class WorkoutDef(models.Model):

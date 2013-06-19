@@ -15,7 +15,8 @@ from simple_rest import Resource
 from django.db.models.query import EmptyQuerySet
 
 from lift.models import ExerciseData, WorkoutData, ExerciseDef, WorkoutDef
-from lift.serializer import ExerciseDataJSONSerializer
+from lift.serializer import (DetailJSONSerializer,
+                                ListJSONSerializer)
 
 
 
@@ -26,8 +27,8 @@ class JsonView(Resource):
     def __init__(self, *args, **kwargs):
         #Serializer = serializers.get_serializer(serializer)
         #Serializer = custom_serializers[serializer]
-        Serializer = ExerciseDataJSONSerializer
-        self.serializer = Serializer()
+        self.detail_serializer = DetailJSONSerializer()
+        self.list_serializer = ListJSONSerializer()
         #print self.serializer
         super(JsonView, self).__init__(*args,**kwargs)
 
@@ -72,7 +73,7 @@ class ModelListJsonView(JsonView):
         return self.query_set
 
     def get(self, request):
-        return HttpResponse(self.serializer.serialize(self.get_query_set()),
+        return HttpResponse(self.list_serializer.serialize(self.get_query_set()),
                 status=200)
 
     def post(self, request):
@@ -105,7 +106,7 @@ class ModelDetailJsonView(JsonView):
         return self.get_model().objects.get(id=id)
 
     def get(self, request, id):
-        return HttpResponse(self.serializer.serialize([self.get_instance(id)]), 
+        return HttpResponse(self.detail_serializer.serialize([self.get_instance(id)]), 
                                         status=200)
 
     def post(self, request, *args, **kwargs):

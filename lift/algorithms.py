@@ -65,8 +65,12 @@ class Algorithm(object):
 
 
     def wrap_data(self, data):
-        return self.DataWrapper().from_dict(data)
+        dw = self.DataWrapper()
+        dw.from_dict(data)
+        return dw
     
+
+
     class DataWrapper(object):
         """
         The `ExercisedataWrapper` defines functionality which can be determined
@@ -91,13 +95,17 @@ class Algorithm(object):
 @registry.register
 class Strongliftish(Algorithm):
 
-    Set = namedlist('Set', ['name', 'assigned_reps', 'completed_reps', 'weight', 'rested_secs'])
+    SetData = namedlist('Set', ['name', 
+                                'assigned_reps', 'completed_reps', 
+                                'assigned_weight', 'completed_weight', 
+                                'start_ts', 'end_ts'])
+   
     SetDef = namedlist('SetDef', ['assigned_reps','work_weight_factor', 'rest_secs'])
 
     DEFAULT_OPTIONS = {
 
         "set_def":{
-            # name:   reps, work_weight_factor, rest_secs
+            # name:   version, reps, work_weight_factor, rest_secs
             "warmup":SetDef(3, 0.5, 60*1.5),
             "work":  SetDef(5, 1.0, 60*1.5),
         },
@@ -127,16 +135,23 @@ class Strongliftish(Algorithm):
             return self
 
         def from_dict(self, data):
-            self.sets = [Strongliftish.Set(*set_) for set_ in data["sets"]]
+            if not data.get("v") or data["v"] != self.version:
+                raise ValueError("Unexpected version of data")
+            self.sets = [Strongliftish.SetData(*set_) for set_ in data["sets"]]
             self.work_weight = data["w"]
+            self.version = data["v"]
 
         def to_dict(self):
-            return {"sets":[set_ for set_ in self.sets], "w":self.work_weight}
+            return {"sets":[set_ for set_ in self.sets], 
+                    "w":self.work_weight,
+                    'v':self.version}
 
         def zero_data(self):
             for set_ in self.sets:
                 set_.completed_reps = 0
-                set_.rested_secs = 0
+                set_.completed_weight = None
+                set_.start_ts = None
+                set_.end_ts = None
 
 
         @property
@@ -146,11 +161,18 @@ class Strongliftish(Algorithm):
                     continue
                 if set_.assigned_reps > set_.completed_reps:
                     return True
+                if set_.completed_weight < set_.assigned_weight:
+                    return True
             return False
 
         @property
         def succeeded(self):
             return not self.failed
+
+        def to_api_dict(self):
+            return {
+                 "sets":[set_ for set_ in self.sets]
+            }
 
 
     def get_default_weight(self):
@@ -165,9 +187,10 @@ class Strongliftish(Algorithm):
 
     def set_new_work_weight(self, exer_data, weight):
         for set_ in exer_data.sets:
-            set_.weight = weight * \
+            set_.assigned_weight = weight * \
                         self.options["set_def"][set_.name].work_weight_factor
         exer_data.work_weight = weight
+
 
     def build_first_exercise_data(self):
 
@@ -176,11 +199,14 @@ class Strongliftish(Algorithm):
         for set_name, set_count in self.options["sets"]:
             for i in xrange(set_count):
                 set_def = self.options["set_def"][set_name]
-                set_ = Strongliftish.Set(name=set_name, 
+                set_ = Strongliftish.SetData(version=1,
+                            name=set_name, 
                             assigned_reps=set_def.assigned_reps,
                             completed_reps=0, 
-                            weight=0, # This is set later 
-                            rested_secs=0)
+                            assigned_weight=0, # This is set later 
+                            completed_weight=0,
+                            start_ts=None,
+                            end_ts=None)
                 exer_data.sets.append(set_)
         self.set_new_work_weight(exer_data, self.get_default_weight())
 

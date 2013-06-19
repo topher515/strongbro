@@ -24,8 +24,9 @@ class StrongliftishAlgorithmTest(TestCase):
 
     def setSuccessData(self, exer_data):
         for set_ in exer_data.sets:
-            set_.completed_reps = 5
-            set_.rested_secs = 60
+            set_.completed_reps = set_.assigned_reps
+            set_.completed_weight = set_.assigned_weight
+
 
     def setFailureData(self, exer_data):
         self.setSuccessData(exer_data)

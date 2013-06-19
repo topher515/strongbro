@@ -7,4 +7,5 @@ PhoneListCtrl = ($scope, $http)=>
 
 
 ExerciseListCtrl = ($scope, $http)=>
-  $scope.
+  $http.get('/api/exercises/data/').success (data)->
+    $scope.exercises = data
